@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from server.authentication import router as auth_router
+from webchat.view import router as webchat_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -21,8 +22,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router, tags=["Auth"])
-
+app.include_router(auth_router, tags=["Auth"],)
+app.include_router(webchat_router, tags=["Webchat"], prefix="/webchat")
 @app.get("/", tags=["Test"])
 async def test_response():
     return "Api Start"
