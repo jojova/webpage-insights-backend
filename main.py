@@ -29,3 +29,4 @@ async def test_response():
     return "Api Start"
 
 
+app.mount("/exports", StaticFiles(directory="exports"), name="exports")
