@@ -29,9 +29,11 @@ prompt = ChatPromptTemplate.from_messages(messages)
 chain_type_kwargs = {"prompt": prompt}
 
 
+
 class Query(BaseModel):
     url: str
     question: str
+
 
 def get_response(url,question):
     # Load data from the specified URL
@@ -49,6 +51,7 @@ def get_response(url,question):
 
     # Create OpenAI embeddings
     openai_embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+
 
     # Create a Chroma vector database from the documents
     vectordb = Chroma.from_documents(documents=docs,
@@ -69,7 +72,7 @@ def get_response(url,question):
     # Run the prompt and return the response
     response = qa(question)
 
-    print(response)
+    return response
 
 
 @router.post("/query/")
