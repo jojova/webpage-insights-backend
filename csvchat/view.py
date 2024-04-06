@@ -19,7 +19,7 @@ def get_response(file:StringIO, question:str):
 	df = pd.read_csv(file)
 	chat_df = SmartDataframe(df, config={"llm": llm})
 	response = chat_df.chat(question)
-	if isinstance(response) == str:
+	if isinstance(response,str):
 		return response
 	raise HTTPException(status_code=500, detail="only chat is supported")
 
