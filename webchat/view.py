@@ -15,7 +15,7 @@ from langchain.vectorstores import Chroma
 load_dotenv("")
 
 router = APIRouter()
-system_template = """Use the following pieces of context to answer the users question.
+system_template = """Use the following pieces of context only to answer the users question. Don't 
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
 """
 
@@ -70,7 +70,8 @@ def get_response(url,question):
     qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
 
     # Run the prompt and return the response
-    response = qa(question)
+    response = qa("""Use the following pieces of context only to answer the users question. Don't 
+If you don't know the answer, just say that you don't know, don't try to make up an answer."""+ question)
 
     return response
 
