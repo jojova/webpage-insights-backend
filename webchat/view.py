@@ -78,6 +78,6 @@ def get_response(url,question):
 @router.post("/query/")
 async def query_website(query: Query):
     try:
-        return {"response":  "get_response(query.url, query.question)"}
+        return {"response":  get_response(query.url, query.question)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

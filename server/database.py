@@ -5,7 +5,7 @@ import os
 
 load_dotenv()
 
-mongodb_client = MongoClient(os.environ.get("MONGO_URL"))
+mongodb_client = MongoClient("mongodb+srv://admin:pass1Pass2@cluster0.d7djdrl.mongodb.net/?retryWrites=true&w=majority")
 
 
 def startup_db_client():
