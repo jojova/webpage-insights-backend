@@ -1,3 +1,4 @@
+import re
 import openai
 import spacy
 from fastapi import HTTPException, APIRouter
@@ -8,8 +9,13 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from heapq import nlargest
 import urllib.parse
 from youtube_transcript_api import YouTubeTranscriptApi
+from langchain.document_loaders import WebBaseLoader
 router = APIRouter()
 import os
+from bs4 import BeautifulSoup
+from string import punctuation
+from typing import List
+import requests 
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
@@ -19,7 +25,7 @@ from langchain.prompts.chat import (ChatPromptTemplate,
                                     SystemMessagePromptTemplate)
 
 OPENAI_API_KEY = "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"
-system_template = """Use the following pieces of context to answer the users question.
+system_template = """Use the following pieces of context only to answer the users question. Don't use other knowledge.
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
 """
 
@@ -58,13 +64,9 @@ def get_response(paragraph, question):
     docs = text_splitter.create_documents(pages)
 
 
-
-    print("kooi")
-
     vectordb = Chroma.from_documents(documents=docs,
                                      embedding=embeddings,
                                      persist_directory=DB_DIR)
-    print("kooi2")
     vectordb.persist()
 
     # Create a retriever from the Chroma vector database
@@ -72,12 +74,12 @@ def get_response(paragraph, question):
 
     # Use a ChatOpenAI model
     llm = ChatOpenAI(model_name='gpt-3.5-turbo', openai_api_key=OPENAI_API_KEY)
-    print("kooi3")
     # Create a RetrievalQA from the model and retriever
     qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
 
     # Run the prompt and return the response
-    response = qa(question)
+    response = qa("""Use the following pieces of context only to answer the users question. Don't use other knowledge.
+If you don't know the answer, just say that you don't know, don't try to make up an answer."""+question)
 
     return response
 
@@ -99,58 +101,71 @@ def get_transcript(url):
 
     return transcript, no_of_words
 
-
 def clean(transcript):
-    from string import punctuation
-
-    stopwords = list(STOP_WORDS)
-
+    # Load English language model
     nlp = spacy.load('en_core_web_lg')
 
+    # Tokenize the transcript in batches
     doc = nlp(transcript)
-    punctuated_text = ''
-    for token in doc:
-        # Add a space after each token
-        punctuated_text += token.text + ' '
-        # If the token ends a sentence, add a period
-        if token.is_sent_end:
-            punctuated_text = punctuated_text[:-1] + '. '
-
-    # Print the punctuated text
-    # print(punctuated_text)
-    tokens = [token.text for token in doc]
-    # print(tokens)
-    punctuation = punctuation + '\n'
-    word_frequencies = {}
-    for word in doc:
-        if word.text.lower() not in stopwords:
-            if word.text.lower() not in punctuation:
-                if word.text not in word_frequencies.keys():
+    
+    # Process sentences in batches
+    sentence_scores = {}
+    for sent in doc.sents:
+        word_frequencies = {}
+        for word in sent:
+            if word.text.lower() not in STOP_WORDS and word.text.lower() not in punctuation:
+                if word.text not in word_frequencies:
                     word_frequencies[word.text] = 1
                 else:
                     word_frequencies[word.text] += 1
-    # print(word_frequencies)
-    max_frequency = max(word_frequencies.values())
-    for word in word_frequencies.keys():
-        word_frequencies[word] = word_frequencies[word] / max_frequency
-        # print(word_frequencies)
-    sentence_tokens = [sent for sent in doc.sents]
-    # print(sentence_tokens)
-    sentence_scores = {}
-    for sent in sentence_tokens:
-        for word in sent:
-            if word.text.lower() in word_frequencies.keys():
-                if sent not in sentence_scores.keys():
-                    sentence_scores[sent] = word_frequencies[word.text.lower()]
-                else:
-                    sentence_scores[sent] += word_frequencies[word.text.lower()]
-    select_length = int(len(sentence_tokens) * 0.3)
+
+        # Normalize word frequencies for each sentence
+        max_frequency = max(word_frequencies.values()) if word_frequencies else 1
+        for word in word_frequencies:
+            word_frequencies[word] = word_frequencies[word] / max_frequency
+
+        # Calculate sentence score
+        sentence_score = sum(word_frequencies.values())
+        sentence_scores[sent] = sentence_score
+
+    # Select top 30% sentences based on scores
+    select_length = int(len(list(doc.sents)) * 0.3)
     summary = nlargest(select_length, sentence_scores, key=sentence_scores.get)
-    final_summary = [word.text for word in summary]
-    summary = ' '.join(final_summary)
 
-    return summary
+    # Join selected sentences into final summary
+    final_summary = ' '.join([sent.text for sent in summary])
 
+    return final_summary
+
+
+def scrape_relevant_paragraphs(url, min_paragraph_length=50, keywords=None):
+    # Send a GET request to the URL
+    response = requests.get(url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Parse the HTML content
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Find all paragraph elements
+        paragraphs = soup.find_all('p')
+
+        # Extract text from paragraphs and filter based on length and keywords
+        relevant_paragraphs = []
+        for p in paragraphs:
+            text = p.get_text().strip()
+            if len(text) >= min_paragraph_length:
+                if keywords:
+                    if any(keyword.lower() in text.lower() for keyword in keywords):
+                        relevant_paragraphs.append(text)
+                else:
+                    relevant_paragraphs.append(text)
+
+        # Return relevant text paragraphs
+        return relevant_paragraphs
+    else:
+        print(f"Failed to fetch URL: {response.status_code}")
+        return []
 
 @router.post("/text/")
 async def summarise(text: str):
@@ -175,3 +190,12 @@ async def query_paragraph(query: str, paragraph: str):
         return {"response": get_response(paragraph, query)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/content/")
+async def scrape_content(url:str):
+    try:
+        return {"response": scrape_relevant_paragraphs(url)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
