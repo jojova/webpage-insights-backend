@@ -2,7 +2,7 @@ import openai
 import spacy
 from fastapi import HTTPException, APIRouter
 from langchain_community.embeddings.gpt4all import GPT4AllEmbeddings
-from langchain_text_splitters import CharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from openai import OpenAI
 from spacy.lang.en.stop_words import STOP_WORDS
 from heapq import nlargest
@@ -48,9 +48,16 @@ def get_response(paragraph, question):
     if not os.path.exists(DB_DIR):
         os.makedirs(DB_DIR)
 
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-large", openai_api_key=OPENAI_API_KEY)
+    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
     # gneerate embeddings for the paragraph
-    docs = generate_embeddings(paragraph)
+     # Split the loaded data
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    pages = text_splitter.split_text(paragraph)
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    docs = text_splitter.create_documents(pages)
+
+
 
     print("kooi")
 
