@@ -3,6 +3,7 @@ from server.authentication import router as auth_router
 from webchat.view import router as webchat_router
 from summarize.view import router as summarize_router
 from csvchat.view import router as csv_chat_router
+from scrape.view import router as scrape_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -28,6 +29,7 @@ app.include_router(auth_router, tags=["Auth"],)
 app.include_router(webchat_router, tags=["Webchat"], prefix="/webchat")
 app.include_router(summarize_router, tags=["Summarize"], prefix="/summarize")
 app.include_router(csv_chat_router,tags=["CSV"], prefix="/csv")
+app.include_router(scrape_router,tags=["Scrape"], prefix="/scrape")
 
 @app.get("/", tags=["Test"])
 async def test_response():
