@@ -15,15 +15,15 @@ llm = OpenAI(api_token=OPENAI_API_KEY)
 router = APIRouter()
 
 
-def get_response(file, question):
+def get_response(file:StringIO, question:str):
 	df = pd.read_csv(file)
 	chat_df = SmartDataframe(df, config={"llm": llm})
 	response = chat_df.chat(question)
-	if type(response) == str:
+	if isinstance(response) == str:
 		return response
 	raise HTTPException(status_code=500, detail="only chat is supported")
 
-def get_piechart(file, question):
+def get_piechart(file:StringIO, question:str):
 	df = pd.read_csv(file)
 	chat_df = SmartDataframe(df, config={"llm": llm, "save_charts": True,})
 	response = chat_df.chat(question)
