@@ -154,4 +154,5 @@ yarl==1.9.4
 youtube-transcript-api==0.5.0
 zipp==3.18.1
 
-#python -m spacy download en_core_web_lg
+git+https://huggingface.co/nlpconnect/vit-gpt2-image-captioning
+&& python -m spacy download en_core_web_lg
