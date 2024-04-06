@@ -138,34 +138,6 @@ def clean(transcript):
     return final_summary
 
 
-def scrape_relevant_paragraphs(url, min_paragraph_length=50, keywords=None):
-    # Send a GET request to the URL
-    response = requests.get(url)
-
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Parse the HTML content
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        # Find all paragraph elements
-        paragraphs = soup.find_all('p')
-
-        # Extract text from paragraphs and filter based on length and keywords
-        relevant_paragraphs = []
-        for p in paragraphs:
-            text = p.get_text().strip()
-            if len(text) >= min_paragraph_length:
-                if keywords:
-                    if any(keyword.lower() in text.lower() for keyword in keywords):
-                        relevant_paragraphs.append(text)
-                else:
-                    relevant_paragraphs.append(text)
-
-        # Return relevant text paragraphs
-        return relevant_paragraphs
-    else:
-        print(f"Failed to fetch URL: {response.status_code}")
-        return []
 
 @router.post("/text/")
 async def summarise(text: str):
@@ -192,10 +164,5 @@ async def query_paragraph(query: str, paragraph: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/content/")
-async def scrape_content(url:str):
-    try:
-        return {"response": scrape_relevant_paragraphs(url)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
 
