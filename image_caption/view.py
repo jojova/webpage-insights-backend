@@ -90,9 +90,9 @@ def predict_step(image_paths):
     return preds
 
 @router.post("/image/")
-async def scrape_content(url:str):
+async def scrape_content(url:List[str]):
     try:
-        return {"response": predict_step([url])}
+        return {"response": predict_step(url)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
