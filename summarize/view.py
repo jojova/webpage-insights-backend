@@ -101,43 +101,54 @@ def get_transcript(url):
 
     return transcript, no_of_words
 
-def clean(transcript):
-    # Load English language model
+def clean(transcript, include_first_sents=1, summary_proportion=0.3):
     nlp = spacy.load('en_core_web_lg')
-
-    # Tokenize the transcript in batches
     doc = nlp(transcript)
-    
-    # Process sentences in batches
+
     sentence_scores = {}
-    for sent in doc.sents:
-        word_frequencies = {}
+    all_sentences = list(doc.sents)
+    
+    # Calculate word frequencies with a focus solely on the content
+    word_frequencies = {}
+    for word in doc:
+        if word.text.lower() not in STOP_WORDS and word.text.lower() not in punctuation:
+            if word.text.lower() not in word_frequencies:
+                word_frequencies[word.text.lower()] = 1
+            else:
+                word_frequencies[word.text.lower()] += 1
+
+    max_frequency = max(word_frequencies.values())
+    
+    # Score sentences based on word frequencies, ignoring sentence position and length
+    for sent in all_sentences:
         for word in sent:
-            if word.text.lower() not in STOP_WORDS and word.text.lower() not in punctuation:
-                if word.text not in word_frequencies:
-                    word_frequencies[word.text] = 1
+            if word.text.lower() in word_frequencies:
+                if sent in sentence_scores:
+                    sentence_scores[sent] += word_frequencies[word.text.lower()] / max_frequency
                 else:
-                    word_frequencies[word.text] += 1
+                    sentence_scores[sent] = word_frequencies[word.text.lower()] / max_frequency
 
-        # Normalize word frequencies for each sentence
-        max_frequency = max(word_frequencies.values()) if word_frequencies else 1
-        for word in word_frequencies:
-            word_frequencies[word] = word_frequencies[word] / max_frequency
+    # Normalize sentence scores
+    max_score = max(sentence_scores.values()) if sentence_scores else 1
+    for sent in sentence_scores:
+        sentence_scores[sent] = sentence_scores[sent] / max_score
 
-        # Calculate sentence score
-        sentence_score = sum(word_frequencies.values())
-        sentence_scores[sent] = sentence_score
+    # Ensure first sentences are included in the summary
+    summary_sentences = all_sentences[:include_first_sents]
+    select_length = max(int(len(all_sentences) * summary_proportion) - include_first_sents, 1)
+    
+    # Select top-scoring sentences for the remainder of the summary
+    remaining_sentences = [s for s in all_sentences if s not in summary_sentences]
+    remaining_scores = {s: score for s, score in sentence_scores.items() if s in remaining_sentences}
+    top_sentences = nlargest(select_length, remaining_scores, key=remaining_scores.get)
 
-    # Select top 30% sentences based on scores
-    select_length = int(len(list(doc.sents)) * 0.3)
-    summary = nlargest(select_length, sentence_scores, key=sentence_scores.get)
+    summary_sentences.extend(top_sentences)
+    # Sort selected sentences into their original order
+    summary_sentences = sorted(summary_sentences, key=lambda x: all_sentences.index(x))
 
-    # Join selected sentences into final summary
-    final_summary = ' '.join([sent.text for sent in summary])
+    final_summary = ' '.join([sent.text for sent in summary_sentences])
 
     return final_summary
-
-
 
 @router.post("/text/")
 async def summarise(text: str):
